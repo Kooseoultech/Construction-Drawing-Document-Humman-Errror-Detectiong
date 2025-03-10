@@ -53,40 +53,31 @@ def compare_csv_files(sc_csv, scd_csv):
 def main():
     st.title("CSV Data Processing and Error Detection")
     
-    uploaded_file1 = st.file_uploader("Upload First CSV file", type=["csv"], key="file1")
-    uploaded_file2 = st.file_uploader("Upload Second CSV file (optional for comparison)", type=["csv"], key="file2")
+    tab1, tab2, tab3 = st.tabs(["Code 1", "Code 2", "Code 3"])
     
-    if uploaded_file1 is not None:
-        df1 = pd.read_csv(uploaded_file1)
-        st.write("### Uploaded Data Preview (File 1)")
-        st.write(df1.head())
-        
-        if st.button("Find Duplicate Member Codes and Directions", key="dup1"):
+    with tab1:
+        st.header("Duplicate Member Code and Direction Finder")
+        uploaded_file1 = st.file_uploader("Upload CSV file", type=["csv"], key="file1")
+        if uploaded_file1 is not None:
             duplicates = find_duplicate_member_direction(uploaded_file1)
             st.write("### Duplicate Member Codes and Directions")
             st.write(duplicates)
-        
-        if st.button("Find Fully Duplicate Rows", key="dup2"):
-            full_duplicates = find_duplicates_in_csv(uploaded_file1)
+    
+    with tab2:
+        st.header("Find Fully Duplicate Rows")
+        uploaded_file2 = st.file_uploader("Upload CSV file", type=["csv"], key="file2")
+        if uploaded_file2 is not None:
+            full_duplicates = find_duplicates_in_csv(uploaded_file2)
             st.write("### Fully Duplicate Rows")
             st.write(full_duplicates)
-        
-        if st.button("Remove Duplicates", key="clean1"):
-            cleaned_df = remove_duplicates(df1)
-            st.write("### Data After Removing Duplicates")
-            st.write(cleaned_df)
-            
-            cleaned_file_path = "cleaned_data1.csv"
-            cleaned_df.to_csv(cleaned_file_path, index=False)
-            st.download_button(label="Download Cleaned Data", data=open(cleaned_file_path, "rb").read(), file_name="cleaned_data1.csv", mime="text/csv")
     
-    if uploaded_file1 is not None and uploaded_file2 is not None:
-        df2 = pd.read_csv(uploaded_file2)
-        st.write("### Uploaded Data Preview (File 2)")
-        st.write(df2.head())
+    with tab3:
+        st.header("CSV File Comparison")
+        uploaded_file3 = st.file_uploader("Upload First CSV file", type=["csv"], key="file3")
+        uploaded_file4 = st.file_uploader("Upload Second CSV file", type=["csv"], key="file4")
         
-        if st.button("Compare Files for Errors", key="compare"):
-            error_df = compare_csv_files(uploaded_file1, uploaded_file2)
+        if uploaded_file3 is not None and uploaded_file4 is not None:
+            error_df = compare_csv_files(uploaded_file3, uploaded_file4)
             st.write("### Error Report")
             st.write(error_df)
             
