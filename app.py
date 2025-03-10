@@ -1,42 +1,98 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Mar 10 17:05:26 2025
-
-@author: S3PARC
-"""
-import sys
-sys.path.append(r"C:\Users\S3PARC\AppData\Local\Programs\Python\Python310\lib\site-packages")
-
 import streamlit as st
-from PIL import Image
+import pandas as pd
+import os
+import re
 import numpy as np
-from surya_ocr import run_ocr
-from surya_ocr.models import load_detection_model, load_recognition_model
 
-@st.cache_resource
-def load_models():
-    det_model = load_detection_model()
-    rec_model = load_recognition_model()
-    return det_model, rec_model
+def find_duplicate_member_direction(input_csv):
+    df = pd.read_csv(input_csv)
+    dup_group = df.groupby(["Member code", "Direction"]).size().reset_index(name="Count")
+    duplicates = dup_group[dup_group["Count"] > 1]
+    return duplicates
 
-st.title("📑 Surya OCR Streamlit 앱")
+def find_duplicates_in_csv(input_csv):
+    df = pd.read_csv(input_csv)
+    subset_cols = ["Page", "Member code", "Direction", "Top_rebar", "Bot_rebar", "Stirrups", "Width", "Height", "Top_Rebar_Img", "Bot_Rebar_Img"]
+    existing_cols = [c for c in subset_cols if c in df.columns]
+    duplicates_mask = df.duplicated(subset=existing_cols, keep=False)
+    return df[duplicates_mask]
 
-# 모델 로드
-det_model, rec_model = load_models()
+def remove_duplicates(df):
+    df_unique = df.drop_duplicates(subset=["Member code", "Direction"], keep='first')
+    return df_unique
 
-# 이미지 업로드
-uploaded_image = st.file_uploader("OCR할 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
+def compare_rows(sc_row, scd_row, direction_exists):
+    errors = []
+    for col in ["Top_rebar", "Bot_rebar", "Stirrups", "Width", "Height"]:
+        if sc_row.get(col) != scd_row.get(col):
+            errors.append(f"{col} mismatch")
+    return errors
 
-if uploaded_image:
-    image = Image.open(uploaded_image).convert("RGB")
-    image_np = np.array(image)
+def compare_csv_files(sc_csv, scd_csv):
+    df_sc = pd.read_csv(sc_csv)
+    df_scd = pd.read_csv(scd_csv)
+    sc_dict = df_sc.set_index(['Member code', 'Direction']).to_dict(orient='index')
+    scd_dict = df_scd.set_index(['Member code', 'Direction']).to_dict(orient='index')
+    
+    all_keys = set(sc_dict.keys()).union(set(scd_dict.keys()))
+    error_records = []
+    
+    for key in all_keys:
+        sc_data = sc_dict.get(key)
+        scd_data = scd_dict.get(key)
+        
+        if sc_data and scd_data:
+            errors = compare_rows(sc_data, scd_data, direction_exists=True)
+            if errors:
+                error_records.append({"Member code": key[0], "Direction": key[1], "Error Detail": ', '.join(errors)})
+        else:
+            error_records.append({"Member code": key[0], "Direction": key[1], "Error Detail": "Missing in one file"})
+    
+    return pd.DataFrame(error_records)
 
-    # OCR 수행
-    result = run_ocr(image_np, det_model, rec_model)
+def main():
+    st.title("CSV Data Processing and Error Detection")
+    
+    uploaded_file1 = st.file_uploader("Upload First CSV file", type=["csv"], key="file1")
+    uploaded_file2 = st.file_uploader("Upload Second CSV file (optional for comparison)", type=["csv"], key="file2")
+    
+    if uploaded_file1 is not None:
+        df1 = pd.read_csv(uploaded_file1)
+        st.write("### Uploaded Data Preview (File 1)")
+        st.write(df1.head())
+        
+        if st.button("Find Duplicate Member Codes and Directions", key="dup1"):
+            duplicates = find_duplicate_member_direction(uploaded_file1)
+            st.write("### Duplicate Member Codes and Directions")
+            st.write(duplicates)
+        
+        if st.button("Find Fully Duplicate Rows", key="dup2"):
+            full_duplicates = find_duplicates_in_csv(uploaded_file1)
+            st.write("### Fully Duplicate Rows")
+            st.write(full_duplicates)
+        
+        if st.button("Remove Duplicates", key="clean1"):
+            cleaned_df = remove_duplicates(df1)
+            st.write("### Data After Removing Duplicates")
+            st.write(cleaned_df)
+            
+            cleaned_file_path = "cleaned_data1.csv"
+            cleaned_df.to_csv(cleaned_file_path, index=False)
+            st.download_button(label="Download Cleaned Data", data=open(cleaned_file_path, "rb").read(), file_name="cleaned_data1.csv", mime="text/csv")
+    
+    if uploaded_file1 is not None and uploaded_file2 is not None:
+        df2 = pd.read_csv(uploaded_file2)
+        st.write("### Uploaded Data Preview (File 2)")
+        st.write(df2.head())
+        
+        if st.button("Compare Files for Errors", key="compare"):
+            error_df = compare_csv_files(uploaded_file1, uploaded_file2)
+            st.write("### Error Report")
+            st.write(error_df)
+            
+            error_file_path = "error_report.csv"
+            error_df.to_csv(error_file_path, index=False)
+            st.download_button(label="Download Error Report", data=open(error_file_path, "rb").read(), file_name="error_report.csv", mime="text/csv")
 
-    # OCR 결과 출력
-    st.subheader("📝 OCR 결과 텍스트")
-    st.write(result)
-
-    st.subheader("🖼️ OCR 결과 이미지")
-    st.image(image, use_column_width=True)
+if __name__ == "__main__":
+    main()
