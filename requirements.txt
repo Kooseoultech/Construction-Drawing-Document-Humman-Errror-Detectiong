@@ -1,4 +1,7 @@
 streamlit
+pdf2image
+pandas
+poppler-utils
 pillow
 numpy
 git+https://github.com/VikParuchuri/surya.git
