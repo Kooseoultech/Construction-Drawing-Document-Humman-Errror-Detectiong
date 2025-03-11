@@ -5,3 +5,6 @@ poppler-utils
 pillow
 numpy
 git+https://github.com/VikParuchuri/surya.git
+git+https://github.com/Layout-Parser/DocLayout-YOLO.git
+huggingface_hub
+torch
